@@ -12,6 +12,7 @@ export interface Note {
 export interface Folder {
   id: string;
   name: string;
+  color: string;
   parentId?: string;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +23,7 @@ export interface Tag {
   name: string;
   color: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface User {

@@ -5,7 +5,6 @@ import { useNotesStore } from '@/lib/store/notes';
 import { useUIStore } from '@/lib/store/ui';
 import { useFoldersStore } from '@/lib/store/folders';
 import { useTagsStore } from '@/lib/store/tags';
-import { useInitialData } from '@/lib/hooks/useInitialData';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Toaster } from '@/components/ui/sonner';
@@ -26,8 +25,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   
   const showSidebar = pathname !== '/settings';
 
-  // Initialize sample data
-  useInitialData();
   
   // Auto-close sidebar on tablet breakpoint
   useEffect(() => {

@@ -199,7 +199,7 @@ export function Sidebar() {
                         onChange={(e) => setNewFolderName(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && newFolderName.trim()) {
-                            createFolder({ name: newFolderName.trim() });
+                            createFolder({ name: newFolderName.trim(), color: '#3b82f6' });
                             setNewFolderName('');
                             setShowNewFolder(false);
                           } else if (e.key === 'Escape') {
@@ -346,7 +346,8 @@ export function Sidebar() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && newTagName.trim()) {
                             createTag({ 
-                              name: newTagName.trim()
+                              name: newTagName.trim(),
+                              color: '#ef4444' // Default red color
                             });
                             setNewTagName('');
                             setShowNewTag(false);

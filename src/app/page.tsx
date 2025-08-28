@@ -4,17 +4,26 @@ import { useState, useEffect } from 'react';
 import { NotesList } from '@/components/notes/NotesList';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { useNotesStore } from '@/lib/store/notes';
+import { useFoldersStore } from '@/lib/store/folders';
+import { useTagsStore } from '@/lib/store/tags';
 import { useUIStore } from '@/lib/store/ui';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
-  const { currentNote } = useNotesStore();
+  const { currentNote, loadNotes, createNote } = useNotesStore();
+  const { loadFolders } = useFoldersStore();
+  const { loadTags } = useTagsStore();
   const { selectedFolder, selectedTags, sidebarOpen } = useUIStore();
   const { success } = useToast();
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [localTitle, setLocalTitle] = useState('');
   const [localContent, setLocalContent] = useState('');
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Update local state when current note changes
   useEffect(() => {
@@ -27,6 +36,50 @@ export default function DashboardPage() {
       setLocalContent('');
     }
   }, [currentNote]);
+
+  // Redirect to signin if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin');
+    }
+  }, [user, loading, router]);
+
+  // Load all data when user is authenticated
+  useEffect(() => {
+    if (user && !dataLoaded) {
+      const loadAllData = async () => {
+        try {
+          await Promise.all([
+            loadNotes(),
+            loadFolders(),
+            loadTags()
+          ]);
+          setDataLoaded(true);
+        } catch (error) {
+          console.error('Error loading data:', error);
+        }
+      };
+      
+      loadAllData();
+    }
+  }, [user, dataLoaded, loadNotes, loadFolders, loadTags]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-lg font-medium">Loading...</div>
+          <div className="text-sm text-muted-foreground">Checking authentication</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything while redirecting
+  if (!user) {
+    return null;
+  }
 
   return (
     <>
@@ -81,17 +134,22 @@ export default function DashboardPage() {
                 </p>
                 <div className="space-y-3">
                   <Button 
-                    onClick={() => {
-                      const { createNote, setCurrentNote } = useNotesStore.getState();
-                      const newNote = createNote({
-                        title: 'Untitled',
-                        content: '',
-                        tagIds: selectedTags,
-                        folderId: selectedFolder || undefined,
-                        isPinned: false,
-                      });
-                      setCurrentNote(newNote);
-                      success('New note created!');
+                    onClick={async () => {
+                      try {
+                        const { setCurrentNote } = useNotesStore.getState();
+                        const newNote = await createNote({
+                          title: 'Untitled',
+                          content: '',
+                          tagIds: selectedTags,
+                          folderId: selectedFolder || undefined,
+                          isPinned: false,
+                        });
+                        setCurrentNote(newNote);
+                        success('New note created!');
+                      } catch (error) {
+                        console.error('Error creating note:', error);
+                        success('Error creating note. Please try again.');
+                      }
                     }}
                   >
                     Create New Note

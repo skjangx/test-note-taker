@@ -122,16 +122,20 @@ export function NotesList({ navigateOnSelect = false }: NotesListProps) {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => {
-                  const { createNote, setCurrentNote } = useNotesStore.getState();
-                  const newNote = createNote({
-                    title: 'Untitled',
-                    content: '',
-                    tagIds: selectedTags,
-                    folderId: selectedFolder || undefined,
-                    isPinned: false,
-                  });
-                  setCurrentNote(newNote);
+                onClick={async () => {
+                  try {
+                    const { createNote, setCurrentNote } = useNotesStore.getState();
+                    const newNote = await createNote({
+                      title: 'Untitled',
+                      content: '',
+                      tagIds: selectedTags,
+                      folderId: selectedFolder || undefined,
+                      isPinned: false,
+                    });
+                    setCurrentNote(newNote);
+                  } catch (error) {
+                    console.error('Failed to create note:', error);
+                  }
                 }}
               >
                 Create first note
@@ -148,16 +152,20 @@ export function NotesList({ navigateOnSelect = false }: NotesListProps) {
               <div className="space-y-2">
                 <Button 
                   size="sm" 
-                  onClick={() => {
-                    const { createNote, setCurrentNote } = useNotesStore.getState();
-                    const newNote = createNote({
-                      title: 'My First Note',
-                      content: '',
-                      tagIds: selectedTags,
-                      folderId: selectedFolder || undefined,
-                      isPinned: false,
-                    });
-                    setCurrentNote(newNote);
+                  onClick={async () => {
+                    try {
+                      const { createNote, setCurrentNote } = useNotesStore.getState();
+                      const newNote = await createNote({
+                        title: 'My First Note',
+                        content: '',
+                        tagIds: selectedTags,
+                        folderId: selectedFolder || undefined,
+                        isPinned: false,
+                      });
+                      setCurrentNote(newNote);
+                    } catch (error) {
+                      console.error('Failed to create note:', error);
+                    }
                   }}
                 >
                   Create your first note

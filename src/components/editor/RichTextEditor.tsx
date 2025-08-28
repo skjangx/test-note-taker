@@ -209,7 +209,7 @@ export function RichTextEditor({
           <input
             ref={titleRef}
             type="text"
-            value={title}
+            value={title || ''}
             onChange={(e) => handleTitleChange(e.target.value)}
             placeholder="Untitled"
             className="flex-1 text-xl sm:text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground"

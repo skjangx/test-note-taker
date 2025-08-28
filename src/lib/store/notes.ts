@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Note } from '@/types';
-import { cache, generateId, autoSave } from '@/lib/cache';
+import { supabaseService } from '@/lib/supabase-service';
 
 interface NotesStore {
   notes: Note[];
@@ -8,12 +8,12 @@ interface NotesStore {
   loading: boolean;
   
   // Actions
-  loadNotes: () => void;
-  createNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => Note;
-  updateNote: (id: string, updates: Partial<Omit<Note, 'id' | 'createdAt'>>) => void;
-  deleteNote: (id: string) => void;
+  loadNotes: () => Promise<void>;
+  createNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Note>;
+  updateNote: (id: string, updates: Partial<Omit<Note, 'id' | 'createdAt'>>) => Promise<void>;
+  deleteNote: (id: string) => Promise<void>;
   setCurrentNote: (note: Note | null) => void;
-  togglePin: (id: string) => void;
+  togglePin: (id: string) => Promise<void>;
 }
 
 export const useNotesStore = create<NotesStore>((set, get) => ({
@@ -21,81 +21,79 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   currentNote: null,
   loading: false,
 
-  loadNotes: () => {
+  loadNotes: async () => {
     set({ loading: true });
-    const cachedData = cache.get();
-    set({ 
-      notes: cachedData.notes,
-      loading: false 
-    });
+    try {
+      const notes = await supabaseService.getNotes();
+      set({ notes, loading: false });
+    } catch (error) {
+      console.error('Error loading notes:', error);
+      set({ loading: false });
+    }
   },
 
-  createNote: (noteData) => {
-    const now = new Date().toISOString();
-    const newNote: Note = {
-      ...noteData,
-      id: generateId(),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const updatedNotes = [newNote, ...get().notes];
-    set({ notes: updatedNotes, currentNote: newNote });
-    
-    // Save to cache
-    const cachedData = cache.get();
-    autoSave({ ...cachedData, notes: updatedNotes });
-    
-    return newNote;
+  createNote: async (noteData) => {
+    try {
+      const newNote = await supabaseService.createNote(noteData);
+      const updatedNotes = [newNote, ...get().notes];
+      set({ notes: updatedNotes, currentNote: newNote });
+      return newNote;
+    } catch (error) {
+      console.error('Error creating note:', JSON.stringify(error, null, 2));
+      console.error('Create note error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        details: (error as { details?: string })?.details,
+        hint: (error as { hint?: string })?.hint,
+        code: (error as { code?: string })?.code
+      });
+      throw error;
+    }
   },
 
-  updateNote: (id, updates) => {
-    const updatedNotes = get().notes.map(note =>
-      note.id === id
-        ? { ...note, ...updates, updatedAt: new Date().toISOString() }
-        : note
-    );
+  updateNote: async (id, updates) => {
+    try {
+      const updatedNote = await supabaseService.updateNote(id, updates);
+      
+      const updatedNotes = get().notes.map(note =>
+        note.id === id ? updatedNote : note
+      );
 
-    const updatedCurrentNote = get().currentNote?.id === id
-      ? { ...get().currentNote!, ...updates, updatedAt: new Date().toISOString() }
-      : get().currentNote;
+      const updatedCurrentNote = get().currentNote?.id === id
+        ? updatedNote
+        : get().currentNote;
 
-    set({ 
-      notes: updatedNotes,
-      currentNote: updatedCurrentNote
-    });
-
-    // Save to cache
-    const cachedData = cache.get();
-    autoSave({ ...cachedData, notes: updatedNotes });
+      set({ 
+        notes: updatedNotes,
+        currentNote: updatedCurrentNote
+      });
+    } catch (error) {
+      console.error('Error updating note:', JSON.stringify(error, null, 2));
+      console.error('Update note error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        details: (error as { details?: string })?.details,
+        hint: (error as { hint?: string })?.hint,
+        code: (error as { code?: string })?.code
+      });
+      throw error;
+    }
   },
 
-  deleteNote: (id) => {
-    const currentState = get();
-    const updatedNotes = currentState.notes.filter(note => note.id !== id);
-    const wasCurrentNote = currentState.currentNote?.id === id;
-    const updatedCurrentNote = wasCurrentNote ? null : currentState.currentNote;
+  deleteNote: async (id) => {
+    try {
+      await supabaseService.deleteNote(id);
+      
+      const currentState = get();
+      const updatedNotes = currentState.notes.filter(note => note.id !== id);
+      const wasCurrentNote = currentState.currentNote?.id === id;
+      const updatedCurrentNote = wasCurrentNote ? null : currentState.currentNote;
 
-    // Update state
-    set({ 
-      notes: updatedNotes,
-      currentNote: updatedCurrentNote
-    });
-
-    // Save to cache with both notes and currentNote cleared if needed
-    const cachedData = cache.get();
-    const newCachedData = { 
-      ...cachedData, 
-      notes: updatedNotes
-    };
-    
-    cache.set(newCachedData);
-    autoSave(newCachedData);
-    
-    // Force update if we deleted the current note
-    if (wasCurrentNote) {
-      // Trigger a re-render by setting currentNote explicitly
-      setTimeout(() => set({ currentNote: null }), 0);
+      set({ 
+        notes: updatedNotes,
+        currentNote: updatedCurrentNote
+      });
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      throw error;
     }
   },
 
@@ -103,10 +101,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     set({ currentNote: note });
   },
 
-  togglePin: (id) => {
+  togglePin: async (id) => {
     const note = get().notes.find(n => n.id === id);
     if (note) {
-      get().updateNote(id, { isPinned: !note.isPinned });
+      await get().updateNote(id, { isPinned: !note.isPinned });
     }
   },
 }));

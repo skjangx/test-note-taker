@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Plus, Sun, Moon, X } from 'lucide-react';
+import { Search, Plus, Sun, Moon, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useUIStore } from '@/lib/store/ui';
@@ -8,6 +8,7 @@ import { useNotesStore } from '@/lib/store/notes';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Header() {
   const router = useRouter();
@@ -24,31 +25,47 @@ export function Header() {
   
   const createNote = useNotesStore((state) => state.createNote);
   const { success } = useToast();
+  const { signOut } = useAuth();
 
-  const handleCreateNote = () => {
-    const newNote = createNote({
-      title: 'Untitled',
-      content: '',
-      tagIds: selectedTags,
-      folderId: selectedFolder || undefined,
-      isPinned: false,
-    });
-    
-    // Set as current note and navigate appropriately
-    useNotesStore.getState().setCurrentNote(newNote);
-    
-    // Show success toast
-    success('New note created!');
-    
-    // Navigate based on current context
-    if (pathname === '/notes' || pathname.startsWith('/notes/')) {
-      // If we're on notes pages, navigate to the new note
-      router.push(`/notes/${newNote.id}`);
-    } else if (pathname !== '/') {
-      // If we're not on dashboard, go to dashboard to see the editor
-      router.push('/');
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      success('Signed out successfully');
+      router.push('/auth/signin');
+    } catch (error) {
+      console.error('Sign out error:', error);
     }
-    // If we're on dashboard, just select the note (no navigation needed)
+  };
+
+  const handleCreateNote = async () => {
+    try {
+      const newNote = await createNote({
+        title: 'Untitled',
+        content: '',
+        tagIds: selectedTags,
+        folderId: selectedFolder || undefined,
+        isPinned: false,
+      });
+      
+      // Set as current note and navigate appropriately
+      useNotesStore.getState().setCurrentNote(newNote);
+      
+      // Show success toast
+      success('New note created!');
+      
+      // Navigate based on current context
+      if (pathname === '/notes' || pathname.startsWith('/notes/')) {
+        // If we're on notes pages, navigate to the new note
+        router.push(`/notes/${newNote.id}`);
+      } else if (pathname !== '/') {
+        // If we're not on dashboard, go to dashboard to see the editor
+        router.push('/');
+      }
+      // If we're on dashboard, just select the note (no navigation needed)
+    } catch (error) {
+      console.error('Error creating note:', error);
+      success('Error creating note. Please try again.');
+    }
   };
 
   // Hide header on settings page
@@ -109,6 +126,16 @@ export function Header() {
             ) : (
               <Sun className="h-4 w-4" />
             )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>

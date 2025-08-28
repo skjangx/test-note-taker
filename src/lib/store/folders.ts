@@ -1,70 +1,66 @@
 import { create } from 'zustand';
 import { Folder } from '@/types';
-import { cache, generateId, autoSave } from '@/lib/cache';
+import { supabaseService } from '@/lib/supabase-service';
 
 interface FoldersStore {
   folders: Folder[];
   loading: boolean;
   
   // Actions
-  loadFolders: () => void;
-  createFolder: (folder: Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>) => Folder;
-  updateFolder: (id: string, updates: Partial<Omit<Folder, 'id' | 'createdAt'>>) => void;
-  deleteFolder: (id: string) => void;
+  loadFolders: () => Promise<void>;
+  createFolder: (folder: Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Folder>;
+  updateFolder: (id: string, updates: Partial<Omit<Folder, 'id' | 'createdAt'>>) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
 }
 
 export const useFoldersStore = create<FoldersStore>((set, get) => ({
   folders: [],
   loading: false,
 
-  loadFolders: () => {
+  loadFolders: async () => {
     set({ loading: true });
-    const cachedData = cache.get();
-    set({ 
-      folders: cachedData.folders,
-      loading: false 
-    });
+    try {
+      const folders = await supabaseService.getFolders();
+      set({ folders, loading: false });
+    } catch (error) {
+      console.error('Error loading folders:', error);
+      set({ loading: false });
+    }
   },
 
-  createFolder: (folderData) => {
-    const now = new Date().toISOString();
-    const newFolder: Folder = {
-      ...folderData,
-      id: generateId(),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const updatedFolders = [...get().folders, newFolder];
-    set({ folders: updatedFolders });
-    
-    // Save to cache
-    const cachedData = cache.get();
-    autoSave({ ...cachedData, folders: updatedFolders });
-    
-    return newFolder;
+  createFolder: async (folderData) => {
+    try {
+      const newFolder = await supabaseService.createFolder(folderData);
+      const updatedFolders = [...get().folders, newFolder];
+      set({ folders: updatedFolders });
+      return newFolder;
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      throw error;
+    }
   },
 
-  updateFolder: (id, updates) => {
-    const updatedFolders = get().folders.map(folder =>
-      folder.id === id
-        ? { ...folder, ...updates, updatedAt: new Date().toISOString() }
-        : folder
-    );
-
-    set({ folders: updatedFolders });
-
-    // Save to cache
-    const cachedData = cache.get();
-    autoSave({ ...cachedData, folders: updatedFolders });
+  updateFolder: async (id, updates) => {
+    try {
+      const updatedFolder = await supabaseService.updateFolder(id, updates);
+      const updatedFolders = get().folders.map(folder =>
+        folder.id === id ? updatedFolder : folder
+      );
+      set({ folders: updatedFolders });
+    } catch (error) {
+      console.error('Error updating folder:', error);
+      throw error;
+    }
   },
 
-  deleteFolder: (id) => {
-    const updatedFolders = get().folders.filter(folder => folder.id !== id);
-    set({ folders: updatedFolders });
-
-    // Save to cache
-    const cachedData = cache.get();
-    cache.set({ ...cachedData, folders: updatedFolders });
+  deleteFolder: async (id) => {
+    try {
+      await supabaseService.deleteFolder(id);
+      const updatedFolders = get().folders.filter(folder => folder.id !== id);
+      set({ folders: updatedFolders });
+    } catch (error) {
+      console.error('Error deleting folder:', error);
+      throw error;
+    }
   },
 }));
