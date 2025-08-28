@@ -46,7 +46,17 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-md">
+      <div className="w-full max-w-md space-y-8">
+        {/* App Header/Logo */}
+        <div className="text-center">
+          <div className="text-6xl mb-4">📝</div>
+          <h1 className="text-3xl font-bold text-foreground">Notes</h1>
+          <p className="text-lg text-muted-foreground mt-2">
+            Capture your thoughts, organize your ideas
+          </p>
+        </div>
+        
+        <Card className="w-full">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <p className="text-muted-foreground">
@@ -114,6 +124,19 @@ export default function SignInPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Attribution Footer */}
+      <div className="text-center mt-8">
+        <p className="text-xs text-muted-foreground">
+          Built by{' '}
+          <span className="font-medium">skjangx</span>
+          {' '}to test Supabase BE
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Aug 27th to 28th, 2025
+        </p>
+      </div>
+      </div>
     </div>
   )
 }

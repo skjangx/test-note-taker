@@ -7,20 +7,28 @@ import { Label } from '@/components/ui/label';
 import { useUIStore } from '@/lib/store/ui';
 import { useNotesStore } from '@/lib/store/notes';
 import { useToast } from '@/hooks/use-toast';
-import { cache } from '@/lib/cache';
-import { Download, Upload, Trash2, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { Download, Upload, Trash2, Moon, Sun, ArrowLeft, Eye, EyeOff, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useUIStore();
   const { notes } = useNotesStore();
   const { success, error } = useToast();
+  const { user } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleExportData = () => {
     try {
-      const data = cache.get();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { 
+      // Export current notes from the store (which reflects Supabase data)
+      const exportData = {
+        notes,
+        exportedAt: new Date().toISOString(),
+        version: '1.0'
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
         type: 'application/json' 
       });
       const url = URL.createObjectURL(blob);
@@ -36,29 +44,11 @@ export default function SettingsPage() {
   };
 
   const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        cache.set(data);
-        success('Data imported successfully! Refreshing page...');
-        setTimeout(() => window.location.reload(), 1000);
-      } catch (err) {
-        error('Invalid backup file format');
-      }
-    };
-    reader.readAsText(file);
+    error('Import feature coming soon - data is now stored securely in Supabase');
   };
 
   const handleClearAllData = () => {
-    if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
-      cache.clear();
-      success('All data cleared successfully! Refreshing page...');
-      setTimeout(() => window.location.reload(), 1000);
-    }
+    error('Clear data feature disabled - data is now stored securely in Supabase. Contact support for account deletion.');
   };
 
   return (
@@ -79,7 +69,7 @@ export default function SettingsPage() {
         
         <h1 className="text-2xl font-bold mb-8">Settings</h1>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Appearance */}
         <Card>
           <CardHeader>
@@ -104,6 +94,54 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Account */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Account
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-email">Email</Label>
+              <div className="p-2 bg-muted rounded-md">
+                <p className="text-sm font-mono">{user?.email || 'Not signed in'}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="account-password">Password</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 p-2 bg-muted rounded-md">
+                  <p className="text-sm font-mono">
+                    {showPassword ? '[Hidden for security]' : '••••••••••••'}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="p-2"
+                  title={showPassword ? 'Hide password' : 'Show password info'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {showPassword 
+                  ? 'Passwords are encrypted and cannot be displayed for security reasons'
+                  : 'Passwords are managed securely by Supabase'
+                }
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Data Management */}
         <Card>
           <CardHeader>
@@ -113,7 +151,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Total Notes</p>
-                <p className="text-sm text-muted-foreground">{notes.length} notes stored locally</p>
+                <p className="text-sm text-muted-foreground">{notes.length} notes stored securely in Supabase</p>
               </div>
             </div>
 
@@ -159,13 +197,33 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>About</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Notes App - A modern note-taking application built with Next.js, Tailwind CSS, and shadcn/ui.
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Currently running in prototype mode with local storage.
-            </p>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">📝 Notes</p>
+              <p className="text-sm text-muted-foreground">
+                A modern note-taking application built with Next.js, Tailwind CSS, shadcn/ui, and Supabase.
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium">🔧 Technology Stack</p>
+              <p className="text-sm text-muted-foreground">
+                Frontend: Next.js 15, TypeScript, Zustand, Tiptap Editor
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Backend: Supabase (PostgreSQL, Auth, Real-time)
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium">👨‍💻 Development</p>
+              <p className="text-sm text-muted-foreground">
+                Built by <span className="font-medium">skjangx</span> to test Supabase backend integration
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Development period: August 27-28, 2025
+              </p>
+            </div>
           </CardContent>
         </Card>
         </div>
