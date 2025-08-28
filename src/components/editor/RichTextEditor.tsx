@@ -84,20 +84,24 @@ export function RichTextEditor({
         // }
         
         // Show saving indicator
-        setSaveStatus('saving');
+        setSaveStatus('unsaved');
         
         // Clear previous timeout
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
         
-        // Update immediately
-        updateNote(noteId, { content: newContent });
-        
-        // Show saved status after short delay
-        saveTimeoutRef.current = setTimeout(() => {
-          setSaveStatus('saved');
-        }, 500);
+        // Debounce the database update - only save after user stops typing
+        saveTimeoutRef.current = setTimeout(async () => {
+          setSaveStatus('saving');
+          try {
+            await updateNote(noteId, { content: newContent });
+            setSaveStatus('saved');
+          } catch (error) {
+            console.error('Failed to save content:', error);
+            setSaveStatus('unsaved');
+          }
+        }, 2000); // Wait 2 seconds after user stops typing for content
       }
     },
     editorProps: {
@@ -129,20 +133,24 @@ export function RichTextEditor({
     onTitleChange(newTitle);
     
     // Show saving indicator
-    setSaveStatus('saving');
+    setSaveStatus('unsaved');
     
     // Clear previous timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
     
-    // Update immediately
-    updateNote(noteId, { title: newTitle });
-    
-    // Show saved status after short delay
-    saveTimeoutRef.current = setTimeout(() => {
-      setSaveStatus('saved');
-    }, 500);
+    // Debounce the database update - only save after user stops typing
+    saveTimeoutRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        await updateNote(noteId, { title: newTitle });
+        setSaveStatus('saved');
+      } catch (error) {
+        console.error('Failed to save title:', error);
+        setSaveStatus('unsaved');
+      }
+    }, 1000); // Wait 1 second after user stops typing
   };
 
   const handleDeleteNote = () => {
