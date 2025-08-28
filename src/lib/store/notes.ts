@@ -51,8 +51,35 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   },
 
   updateNote: async (id, updates) => {
+    console.log('🔍 UpdateNote called:', { id, updates, totalNotes: get().notes.length });
+    
     try {
+      // Check if note exists in local store first
+      const currentNote = get().notes.find(note => note.id === id);
+      console.log('📝 Note found in local store:', currentNote ? 'YES' : 'NO');
+      
+      if (!currentNote) {
+        console.warn(`Note with ID ${id} not found in local store. Current notes:`, 
+          get().notes.map(n => ({ id: n.id, title: n.title }))
+        );
+        console.warn('Reloading notes from database...');
+        
+        // Try to reload notes from database
+        await get().loadNotes();
+        const reloadedNote = get().notes.find(note => note.id === id);
+        
+        if (!reloadedNote) {
+          console.error(`Note with ID ${id} still not found after reload. Available notes:`,
+            get().notes.map(n => ({ id: n.id, title: n.title }))
+          );
+          throw new Error(`Note with ID ${id} not found in database. It may have been deleted.`);
+        }
+        console.log('✅ Note found after reload');
+      }
+
+      console.log('🔄 Calling supabaseService.updateNote...');
       const updatedNote = await supabaseService.updateNote(id, updates);
+      console.log('✅ Database update successful');
       
       const updatedNotes = get().notes.map(note =>
         note.id === id ? updatedNote : note
@@ -66,9 +93,11 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         notes: updatedNotes,
         currentNote: updatedCurrentNote
       });
+      
+      console.log('✅ Store updated successfully');
     } catch (error) {
-      console.error('Error updating note:', JSON.stringify(error, null, 2));
-      console.error('Update note error details:', {
+      console.error('❌ Error updating note:', JSON.stringify(error, null, 2));
+      console.error('❌ Update note error details:', {
         message: error instanceof Error ? error.message : 'Unknown error',
         details: (error as { details?: string })?.details,
         hint: (error as { hint?: string })?.hint,

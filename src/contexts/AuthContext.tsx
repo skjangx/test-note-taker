@@ -4,8 +4,8 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { User, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
-// Helper function to ensure user profile exists
-const ensureUserProfile = async (user: User) => {
+// Helper function to ensure user profile exists (lightweight check)
+const ensureUserProfile = async (user: User): Promise<boolean> => {
   try {
     // Check if profile exists
     const { data: existingProfile, error: checkError } = await supabase
@@ -26,81 +26,84 @@ const ensureUserProfile = async (user: User) => {
 
       if (createError) {
         console.error('Failed to create user profile:', createError)
+        return false
       } else {
         console.log('User profile created successfully')
-        
-        // Create sample data for new users
-        try {
-          // Create folders first
-          console.log('Creating sample folders...')
-          const { data: foldersData, error: foldersError } = await supabase
-            .from('folders')
-            .insert([
-              { user_id: user.id, name: 'Personal', color: '#3b82f6' },
-              { user_id: user.id, name: 'Work', color: '#22c55e' },
-              { user_id: user.id, name: 'Ideas', color: '#f59e0b' }
-            ])
-            .select()
-
-          if (foldersError) {
-            console.error('Failed to create folders:', JSON.stringify(foldersError, null, 2))
-            console.error('Folders error details:', {
-              message: foldersError.message,
-              details: foldersError.details,
-              hint: foldersError.hint,
-              code: foldersError.code
-            })
-          } else {
-            console.log('✅ Sample folders created:', foldersData)
-          }
-
-          // Create tags second
-          console.log('Creating sample tags...')
-          const { data: tagsData, error: tagsError } = await supabase
-            .from('tags')
-            .insert([
-              { user_id: user.id, name: 'important', color: '#ef4444' },
-              { user_id: user.id, name: 'draft', color: '#f97316' },
-              { user_id: user.id, name: 'meeting', color: '#8b5cf6' },
-              { user_id: user.id, name: 'project', color: '#22c55e' }
-            ])
-            .select()
-
-          if (tagsError) {
-            console.error('Failed to create tags:', tagsError)
-          } else {
-            console.log('✅ Sample tags created:', tagsData)
-          }
-
-          // Create a sample note if we have folders and tags
-          if (!foldersError && !tagsError && foldersData && tagsData) {
-            console.log('Creating sample note...')
-            const { data: noteData, error: noteError } = await supabase
-              .from('notes')
-              .insert({
-                user_id: user.id,
-                title: 'Welcome to Your Notes!',
-                content: '<p>👋 Welcome to your new note-taking app!</p><p>This is your first note. You can:</p><ul><li>📝 Create and edit notes</li><li>📁 Organize with folders</li><li>🏷️ Add tags for better organization</li><li>📌 Pin important notes</li></ul><p>Start writing and organizing your thoughts!</p>',
-                folder_id: foldersData[0].id,
-                is_pinned: false
-              })
-              .select()
-
-            if (noteError) {
-              console.error('Failed to create sample note:', noteError)
-            } else {
-              console.log('✅ Sample note created:', noteData)
-            }
-          }
-
-          console.log('Sample data creation completed')
-        } catch (sampleError) {
-          console.error('Unexpected error creating sample data:', sampleError)
-        }
+        // Return true to indicate this is a new user (needs sample data)
+        return true
       }
     }
+    
+    // Profile exists, not a new user
+    return false
   } catch (error) {
     console.error('Error ensuring user profile:', error)
+    return false
+  }
+}
+
+// Helper function to create sample data (run in background)
+const createSampleDataAsync = async (user: User) => {
+  try {
+    // Create folders first
+    console.log('Creating sample folders...')
+    const { data: foldersData, error: foldersError } = await supabase
+      .from('folders')
+      .insert([
+        { user_id: user.id, name: 'Personal', color: '#3b82f6' },
+        { user_id: user.id, name: 'Work', color: '#22c55e' },
+        { user_id: user.id, name: 'Ideas', color: '#f59e0b' }
+      ])
+      .select()
+
+    if (foldersError) {
+      console.error('Failed to create folders:', JSON.stringify(foldersError, null, 2))
+    } else {
+      console.log('✅ Sample folders created:', foldersData)
+    }
+
+    // Create tags second
+    console.log('Creating sample tags...')
+    const { data: tagsData, error: tagsError } = await supabase
+      .from('tags')
+      .insert([
+        { user_id: user.id, name: 'important', color: '#ef4444' },
+        { user_id: user.id, name: 'draft', color: '#f97316' },
+        { user_id: user.id, name: 'meeting', color: '#8b5cf6' },
+        { user_id: user.id, name: 'project', color: '#22c55e' }
+      ])
+      .select()
+
+    if (tagsError) {
+      console.error('Failed to create tags:', tagsError)
+    } else {
+      console.log('✅ Sample tags created:', tagsData)
+    }
+
+    // Create a sample note if we have folders and tags
+    if (!foldersError && !tagsError && foldersData && tagsData) {
+      console.log('Creating sample note...')
+      const { data: noteData, error: noteError } = await supabase
+        .from('notes')
+        .insert({
+          user_id: user.id,
+          title: 'Welcome to Your Notes!',
+          content: '<p>👋 Welcome to your new note-taking app!</p><p>This is your first note. You can:</p><ul><li>📝 Create and edit notes</li><li>📁 Organize with folders</li><li>🏷️ Add tags for better organization</li><li>📌 Pin important notes</li></ul><p>Start writing and organizing your thoughts!</p>',
+          folder_id: foldersData[0].id,
+          is_pinned: false
+        })
+        .select()
+
+      if (noteError) {
+        console.error('Failed to create sample note:', noteError)
+      } else {
+        console.log('✅ Sample note created:', noteData)
+      }
+    }
+
+    console.log('Sample data creation completed')
+  } catch (sampleError) {
+    console.error('Unexpected error creating sample data:', sampleError)
   }
 }
 
@@ -127,9 +130,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = session?.user ?? null
       setUser(user)
       
-      // Ensure profile exists if user is authenticated
+      // Fast profile check (non-blocking)
       if (user) {
-        await ensureUserProfile(user)
+        const isNewUser = await ensureUserProfile(user)
+        // Create sample data in background for new users
+        if (isNewUser) {
+          createSampleDataAsync(user).catch(error => 
+            console.error('Background sample data creation failed:', error)
+          )
+        }
       }
       
       setLoading(false)
@@ -142,9 +151,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = session?.user ?? null
       setUser(user)
       
-      // Ensure profile exists if user is authenticated
+      // Fast profile check (non-blocking)
       if (user) {
-        await ensureUserProfile(user)
+        const isNewUser = await ensureUserProfile(user)
+        // Create sample data in background for new users
+        if (isNewUser) {
+          createSampleDataAsync(user).catch(error => 
+            console.error('Background sample data creation failed:', error)
+          )
+        }
       }
       
       setLoading(false)

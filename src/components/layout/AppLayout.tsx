@@ -50,20 +50,26 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   useEffect(() => {
     const initializeApp = async () => {
-      // Load cached data on mount
-      loadNotes();
-      loadFolders();
-      loadTags();
-      
-      // Initialize theme
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-      if (savedTheme) {
-        useUIStore.getState().setTheme(savedTheme);
+      try {
+        // Load data from database (parallel loading)
+        await Promise.all([
+          loadNotes(),
+          loadFolders(),
+          loadTags()
+        ]);
+        
+        // Initialize theme
+        const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+        if (savedTheme) {
+          useUIStore.getState().setTheme(savedTheme);
+        }
+        
+        console.log('✅ App data loaded successfully');
+      } catch (error) {
+        console.error('❌ Error loading app data:', error);
+      } finally {
+        setIsLoading(false);
       }
-      
-      // Small delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setIsLoading(false);
     };
     
     initializeApp();

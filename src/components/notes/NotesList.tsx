@@ -185,125 +185,127 @@ export function NotesList({ navigateOnSelect = false }: NotesListProps) {
           <Card
             key={note.id}
             className={cn(
-              "group cursor-pointer hover:shadow-sm transition-all duration-200 w-full overflow-hidden",
+              "group cursor-pointer hover:shadow-sm transition-all duration-200 w-full overflow-hidden h-[152px]",
               currentNote?.id === note.id && "border-primary/60 border-[1px] shadow-sm"
             )}
             onClick={() => handleNoteSelect(note)}
           >
-            <CardContent className="p-0 w-full">
-              <div className="px-4 py-0.5">
-              {/* Title row with actions */}
-              <div className="flex items-center justify-between gap-3 mb-3 overflow-hidden">
-                <h3 className="font-medium truncate text-sm min-w-0 flex-1">
-                  {note.title || 'Untitled'}
-                </h3>
-                <div className="flex gap-1.5 opacity-60 group-hover:opacity-100 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 hover:bg-muted/50"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePin(note.id);
-                    }}
-                    title={note.isPinned ? 'Unpin note' : 'Pin note'}
-                  >
-                    <Pin className={cn("h-3 w-3", note.isPinned ? "text-yellow-600" : "text-gray-400")} />
-                  </Button>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 w-5 p-0 hover:bg-muted/50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <MoreVertical className="h-3 w-3 text-gray-400" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-destructive focus:text-destructive cursor-pointer"
-                          >
-                            Delete Note
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Note</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete &quot;{note.title || 'Untitled'}&quot;? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => {
-                                deleteNote(note.id);
-                                setTimeout(() => success('Note deleted successfully'), 100);
-                              }}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-              
-              {/* Content preview - full width */}
-              <p className="text-xs text-muted-foreground mb-4 overflow-hidden line-clamp-2 break-all max-w-full leading-relaxed">
-                {note.content ? 
-                  note.content.replace(/<[^>]*>/g, '').substring(0, 120) || 'No content' 
-                  : 'No content'
-                }
-              </p>
-              
-              {/* Meta information row */}
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(note.updatedAt), 'MMM d, yyyy')}
-                </span>
-                
-                {note.tagIds.length > 0 && (
-                  <div className="flex gap-1.5 items-center overflow-hidden flex-shrink-0">
-                    {note.tagIds.slice(0, 2).map((tagId) => {
-                      const tag = tags.find(t => t.id === tagId);
-                      if (!tag) return null;
-                      return (
-                        <Badge 
-                          key={tagId} 
-                          variant="secondary" 
-                          className="text-xs h-5 max-w-20 overflow-hidden"
-                          style={{ 
-                            backgroundColor: `${tag.color}20`, 
-                            borderColor: tag.color,
-                            color: tag.color 
+            <CardContent className="p-0 w-full h-full flex flex-col">
+              <div className="px-4 py-2 pb-3 flex-1 flex flex-col">
+                {/* Title row with actions */}
+                <div className="flex items-center justify-between gap-3 mb-2 overflow-hidden flex-shrink-0">
+                  <h3 className="font-medium truncate text-sm min-w-0 flex-1">
+                    {note.title || 'Untitled'}
+                  </h3>
+                  <div className="flex gap-1.5 opacity-60 group-hover:opacity-100 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 hover:bg-muted/50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePin(note.id);
+                      }}
+                      title={note.isPinned ? 'Unpin note' : 'Pin note'}
+                    >
+                      <Pin className={cn("h-3 w-3", note.isPinned ? "text-yellow-600" : "text-gray-400")} />
+                    </Button>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 hover:bg-muted/50"
+                          onClick={(e) => {
+                            e.stopPropagation();
                           }}
                         >
-                          <span className="truncate block">
-                            {tag.name}
-                          </span>
-                        </Badge>
-                      );
-                    })}
-                    {note.tagIds.length > 2 && (
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        +{note.tagIds.length - 2}
-                      </span>
-                    )}
+                          <MoreVertical className="h-3 w-3 text-gray-400" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                            >
+                              Delete Note
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Note</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete &quot;{note.title || 'Untitled'}&quot;? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  deleteNote(note.id);
+                                  setTimeout(() => success('Note deleted successfully'), 100);
+                                }}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                )}
-              </div>
+                </div>
+                
+                {/* Content preview - fixed height for exactly 2 lines */}
+                <p className="text-xs text-muted-foreground mb-2 overflow-hidden line-clamp-2 break-all max-w-full leading-relaxed h-10">
+                  {note.content ? 
+                    note.content.replace(/<[^>]*>/g, '').substring(0, 120) || 'No content' 
+                    : 'No content'
+                  }
+                </p>
+                
+                {/* Meta information row - always at bottom */}
+                <div className="flex items-center justify-between gap-3 flex-shrink-0 min-h-[20px]">
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(note.updatedAt), 'MMM d, yyyy')}
+                  </span>
+                  
+                  <div className="flex gap-1.5 items-center overflow-hidden flex-shrink-0 min-h-[20px]">
+                    {note.tagIds.length > 0 ? (
+                      <>
+                        {note.tagIds.slice(0, 2).map((tagId) => {
+                          const tag = tags.find(t => t.id === tagId);
+                          if (!tag) return null;
+                          return (
+                            <Badge 
+                              key={tagId} 
+                              variant="secondary" 
+                              className="text-xs h-5 max-w-20 overflow-hidden"
+                              style={{ 
+                                backgroundColor: `${tag.color}20`, 
+                                borderColor: tag.color,
+                                color: tag.color 
+                              }}
+                            >
+                              <span className="truncate block">
+                                {tag.name}
+                              </span>
+                            </Badge>
+                          );
+                        })}
+                        {note.tagIds.length > 2 && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            +{note.tagIds.length - 2}
+                          </span>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

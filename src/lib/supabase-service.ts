@@ -138,8 +138,12 @@ export const supabaseService = {
   },
 
   async updateNote(id: string, updates: Partial<Omit<Note, 'id' | 'createdAt'>>): Promise<Note> {
+    console.log('🔍 supabaseService.updateNote called:', { id, updates });
+    
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
+    
+    console.log('👤 Current user ID:', user.id);
 
     const updateData: Record<string, unknown> = {}
     if (updates.title !== undefined) updateData.title = updates.title
@@ -147,26 +151,79 @@ export const supabaseService = {
     if (updates.folderId !== undefined) updateData.folder_id = updates.folderId
     if (updates.isPinned !== undefined) updateData.is_pinned = updates.isPinned
 
-    const { data, error } = await supabase
-      .from('notes')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    console.log('🔄 Note fields to update:', updateData);
 
-    if (error) throw error
+    let data;
+
+    // Only update notes table if there are actual note fields to update
+    if (Object.keys(updateData).length > 0) {
+      console.log('📝 Updating notes table...');
+      const { data: noteData, error } = await supabase
+        .from('notes')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select(`
+          *,
+          folder:folders(*),
+          note_tags(
+            tag_id,
+            tags(*)
+          )
+        `)
+        .single()
+
+      if (error) {
+        console.error('❌ Notes table update failed:', error);
+        throw error
+      }
+      
+      console.log('✅ Notes table updated successfully:', noteData);
+      data = noteData;
+    } else {
+      console.log('⏩ Skipping notes table update (no fields to update)');
+      // If no note fields to update, just fetch the current note
+      const { data: noteData, error: fetchError } = await supabase
+        .from('notes')
+        .select(`
+          *,
+          folder:folders(*),
+          note_tags(
+            tag_id,
+            tags(*)
+          )
+        `)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (fetchError) {
+        console.error('❌ Failed to fetch current note:', fetchError);
+        throw fetchError;
+      }
+      data = noteData;
+    }
 
     // Update tags if provided
     if (updates.tagIds !== undefined) {
+      console.log('🏷️ Updating tags for note:', id, 'New tags:', updates.tagIds);
+      
       // Remove existing tags
-      await supabase
+      console.log('🗑️ Removing existing tags...');
+      const { error: deleteError } = await supabase
         .from('note_tags')
         .delete()
         .eq('note_id', id)
 
+      if (deleteError) {
+        console.error('❌ Failed to delete existing tags:', deleteError);
+        throw deleteError;
+      }
+      console.log('✅ Existing tags removed');
+
       // Add new tags
       if (updates.tagIds.length > 0) {
+        console.log('➕ Adding new tags:', updates.tagIds);
         const tagInserts = updates.tagIds.map(tagId => ({
           note_id: id,
           tag_id: tagId,
@@ -176,26 +233,42 @@ export const supabaseService = {
           .from('note_tags')
           .insert(tagInserts)
 
-        if (tagError) throw tagError
+        if (tagError) {
+          console.error('❌ Failed to insert new tags:', tagError);
+          throw tagError;
+        }
+        console.log('✅ New tags added successfully');
       }
     }
 
-    // Fetch the complete note with relations
-    const { data: fullNote, error: fetchError } = await supabase
-      .from('notes')
-      .select(`
-        *,
-        folder:folders(*),
-        note_tags(
-          tag_id,
-          tags(*)
-        )
-      `)
-      .eq('id', id)
-      .single()
+    // If we updated tags, fetch the complete note again to get updated relationships
+    if (updates.tagIds !== undefined) {
+      console.log('🔄 Fetching complete note with updated tags...');
+      const { data: fullNote, error: fetchError } = await supabase
+        .from('notes')
+        .select(`
+          *,
+          folder:folders(*),
+          note_tags(
+            tag_id,
+            tags(*)
+          )
+        `)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single()
 
-    if (fetchError) throw fetchError
-    return transformNote(fullNote)
+      if (fetchError) {
+        console.error('❌ Failed to fetch updated note:', fetchError);
+        throw fetchError;
+      }
+      console.log('✅ Successfully fetched updated note with tags:', fullNote);
+      return transformNote(fullNote)
+    } else {
+      // Use the data from the notes table fetch/update (already has relationships)
+      console.log('✅ Using data from notes operation (no tags changed)');
+      return transformNote(data)
+    }
   },
 
   async deleteNote(id: string): Promise<void> {
