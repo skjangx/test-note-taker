@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const { loadTags } = useTagsStore();
   const { selectedFolder, selectedTags, sidebarOpen } = useUIStore();
   const { success } = useToast();
-  const { user, loading } = useAuth();
+  const { user, loading, isSettingUpUser } = useAuth();
   const router = useRouter();
   const [localTitle, setLocalTitle] = useState('');
   const [localContent, setLocalContent] = useState('');
@@ -44,9 +44,9 @@ export default function DashboardPage() {
     }
   }, [user, loading, router]);
 
-  // Load all data when user is authenticated
+  // Load all data when user is authenticated and not being set up
   useEffect(() => {
-    if (user && !dataLoaded) {
+    if (user && !dataLoaded && !isSettingUpUser) {
       const loadAllData = async () => {
         try {
           console.log('🔄 Loading app data...');
@@ -56,7 +56,17 @@ export default function DashboardPage() {
             loadFolders(),
             loadTags()
           ]);
-          console.log('✅ App data loaded successfully');
+          
+          // Debug: Check what was actually loaded
+          const { notes } = useNotesStore.getState();
+          const { folders } = useFoldersStore.getState();
+          const { tags } = useTagsStore.getState();
+          
+          console.log('✅ App data loaded:', { 
+            notesCount: notes.length, 
+            foldersCount: folders.length, 
+            tagsCount: tags.length 
+          });
           setDataLoaded(true);
         } catch (error) {
           console.error('❌ Error loading data:', error);
@@ -65,15 +75,20 @@ export default function DashboardPage() {
       
       loadAllData();
     }
-  }, [user, dataLoaded]);
+  }, [user, dataLoaded, isSettingUpUser]);
 
-  // Show loading state while checking authentication
-  if (loading) {
+  // Show loading state while checking authentication or setting up new user
+  if (loading || isSettingUpUser) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-lg font-medium">Loading...</div>
-          <div className="text-sm text-muted-foreground">Checking authentication</div>
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-lg font-medium">
+            {isSettingUpUser ? 'Setting up your workspace...' : 'Loading...'}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {isSettingUpUser ? 'Creating sample notes and folders' : 'Checking authentication'}
+          </div>
         </div>
       </div>
     );

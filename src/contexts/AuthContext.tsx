@@ -230,6 +230,7 @@ interface AuthContextType {
   loading: boolean
   emailConfirmationSent: boolean
   showWelcomeModal: boolean
+  isSettingUpUser: boolean
   setShowWelcomeModal: (show: boolean) => void
   signIn: (email: string, password: string) => Promise<{ error?: AuthError; isNewUser?: boolean }>
   signUp: (email: string, password: string) => Promise<{ error?: AuthError; emailConfirmationSent?: boolean }>
@@ -244,6 +245,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false)
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+  const [authHandlerProcessedUser, setAuthHandlerProcessedUser] = useState<string | null>(null)
+  const [isSettingUpUser, setIsSettingUpUser] = useState(false)
 
   useEffect(() => {
     let isInitialLoad = true
@@ -260,28 +263,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const user = session?.user ?? null
-      setUser(user)
       
       console.log('🔄 Auth state changed:', { event, isInitialLoad, hasUser: !!user })
       
-      // Only do heavy operations for actual auth events (not initial session)
-      if (!isInitialLoad && user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        console.log(`🔐 User authenticated via ${event}, checking if user needs sample data...`)
+      // CRITICAL: Set loading state BEFORE setting user to prevent empty app flash
+      if (!isInitialLoad && user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+        console.log('🔐 User signing in - SET LOADING STATE FIRST')
+        setIsSettingUpUser(true)
+      }
+      
+      // Now set the user (this will trigger app render)
+      setUser(user)
+      
+      // Debug: Check ALL events to see what's happening
+      if (!isInitialLoad && user) {
+        console.log(`🔍 Auth event: ${event} (user: ${user.id.slice(0, 8)}...)`)
+      }
+      
+      // Handle any user authentication event - check if they need setup
+      if (!isInitialLoad && user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+        console.log('🔐 User signed in, checking if setup needed...')
         
-        // Check if user needs sample data (same logic as normal sign-in)
-        const needsSampleData = await ensureUserProfile(user)
-        if (needsSampleData) {
-          console.log('🆕 User needs sample data (sample_data_created: false), creating...')
+        // Quick check if user needs sample data
+        setTimeout(async () => {
           try {
-            await createSampleDataAsync(user)
-            console.log('✅ Sample data created successfully')
-            setShowWelcomeModal(true)
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('sample_data_created')
+              .eq('id', user.id)
+              .single()
+            
+            if (!profile?.sample_data_created) {
+              console.log('🆕 New user detected, creating sample data...')
+              
+              await createSampleDataAsync(user)
+              console.log('✅ Sample data created, showing welcome modal')
+              
+              setShowWelcomeModal(true)
+            } else {
+              console.log('👤 Existing user, no setup needed')
+            }
+            
+            // Always clear loading state when done
+            setIsSettingUpUser(false)
           } catch (error) {
-            console.error('❌ Failed to create sample data:', error)
+            console.error('Error checking user setup:', error)
+            setIsSettingUpUser(false) // Clear loading state on error too
           }
-        } else {
-          console.log('👤 User already has sample data (sample_data_created: true), no creation needed')
-        }
+        }, 500) // Shorter delay since we're checking all sign-ins
       }
       
       // For page refreshes, ensure profile exists in background (non-blocking)
@@ -308,25 +337,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isNewUser = false
     if (!error && data.user) {
       try {
-        // Check if user profile exists and if sample data has been created
+        // Check if user needs sample data (works for both manual and email confirmation)
         const { data: profile } = await supabase
           .from('profiles')
           .select('sample_data_created')
           .eq('id', data.user.id)
           .maybeSingle()
         
-        // User is considered "new" if they don't have sample data created yet
         isNewUser = !profile?.sample_data_created
-        console.log('🔍 Sign-in user status check:', { 
-          userId: data.user.id,
-          hasProfile: !!profile, 
-          sampleDataCreated: profile?.sample_data_created, 
-          isNewUser,
-          willShowWelcomeToast: !isNewUser,
-          willShowWelcomeModal: isNewUser
-        })
+        
+        // If new user, create sample data and show welcome modal
+        if (isNewUser) {
+          console.log('🆕 New user detected, creating sample data...')
+          await createSampleDataAsync(data.user)
+          console.log('✅ Sample data created, showing welcome modal')
+          setShowWelcomeModal(true)
+        } else {
+          console.log('👤 Existing user, showing welcome toast')
+        }
       } catch (err) {
-        console.error('Error checking user status during signin:', err)
+        console.error('Error checking user status:', err)
       }
     }
     
@@ -341,15 +371,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (!error && data.user && !data.session) {
       // User created but needs email confirmation
-      // Just ensure profile exists, sample data will be created when they confirm and sign in
-      try {
-        console.log('🆕 Ensuring user profile exists for new signup...');
-        await ensureUserProfile(data.user);
-        console.log('✅ User profile ensured for new signup');
-      } catch (profileError) {
-        console.error('❌ Failed to ensure user profile during signup:', profileError);
-        // Don't fail the signup process if profile creation fails
-      }
+      // Profile creation will happen during first sign-in when user exists in auth.users table
+      console.log('🆕 User signup successful, profile will be created on first sign-in');
       
       setEmailConfirmationSent(true)
       return { error: error || undefined, emailConfirmationSent: true }
@@ -375,6 +398,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     emailConfirmationSent,
     showWelcomeModal,
+    isSettingUpUser,
     setShowWelcomeModal,
     signIn,
     signUp,
