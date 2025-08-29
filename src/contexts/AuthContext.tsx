@@ -268,19 +268,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!isInitialLoad && user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
         console.log(`🔐 User authenticated via ${event}, checking if user needs sample data...`)
         
-        // Check if user needs sample data
+        // Check if user needs sample data (same logic as normal sign-in)
         const needsSampleData = await ensureUserProfile(user)
         if (needsSampleData) {
-          console.log('🆕 New user detected (profile created), creating sample data...')
+          console.log('🆕 User needs sample data (sample_data_created: false), creating...')
           try {
             await createSampleDataAsync(user)
-            console.log('✅ Sample data created for new user')
+            console.log('✅ Sample data created successfully')
             setShowWelcomeModal(true)
           } catch (error) {
-            console.error('❌ Failed to create sample data for new user:', error)
+            console.error('❌ Failed to create sample data:', error)
           }
         } else {
-          console.log('👤 Existing user, no sample data needed')
+          console.log('👤 User already has sample data (sample_data_created: true), no creation needed')
         }
       }
       
