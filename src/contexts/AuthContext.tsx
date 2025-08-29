@@ -304,13 +304,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     })
     
-    // If signin successful, check if user needs sample data (indicating new user)
+    // If signin successful, check if this is a new user (sample data not yet created)
     let isNewUser = false
     if (!error && data.user) {
       try {
-        // Quick check if user needs sample data
-        const needsSampleData = await ensureUserProfile(data.user)
-        isNewUser = needsSampleData
+        // Check if user profile exists and if sample data has been created
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('sample_data_created')
+          .eq('id', data.user.id)
+          .maybeSingle()
+        
+        // User is considered "new" if they don't have sample data created yet
+        isNewUser = !profile?.sample_data_created
+        console.log('Sign-in user status:', { hasProfile: !!profile, sampleDataCreated: profile?.sample_data_created, isNewUser })
       } catch (err) {
         console.error('Error checking user status during signin:', err)
       }
