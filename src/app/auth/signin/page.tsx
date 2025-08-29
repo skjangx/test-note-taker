@@ -21,23 +21,67 @@ export default function SignInPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!email || !password) {
-      showError('Please enter your email and password')
+    // Validate email field
+    if (!email.trim()) {
+      showError('Please enter your email address')
+      return
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      showError('Please enter a valid email address')
+      return
+    }
+    
+    // Validate password field
+    if (!password) {
+      showError('Please enter your password')
       return
     }
 
     setIsLoading(true)
     
     try {
-      const { error } = await signIn(email, password)
+      const { error, isNewUser } = await signIn(email, password)
+      
+      console.log('Sign-in result:', { error, isNewUser });
       
       if (error) {
-        showError(error.message)
+        console.log('Error detected:', error.message);
+        
+        // Handle specific error cases for better UX
+        if (error.message.includes('Email not confirmed')) {
+          console.log('Showing email not confirmed error');
+          showError(`Please check your email and click the confirmation link before signing in. If you need a new confirmation email, try signing up again.`)
+        } else if (error.message.includes('Invalid login credentials') || 
+                   error.message.includes('User not found') ||
+                   error.message.includes('Invalid email or password') ||
+                   error.message.toLowerCase().includes('email not found') ||
+                   error.message.toLowerCase().includes('user not found')) {
+          console.log('Showing no account found error');
+          showError(`No account found for "${email}". Please check your email or sign up for a new account.`)
+        } else if (error.message.includes('Invalid email') || 
+                   error.message.includes('Invalid password')) {
+          console.log('Showing invalid credentials error');
+          showError('Invalid email or password. Please check your credentials and try again.')
+        } else {
+          console.log('Showing generic error:', error.message);
+          showError(error.message)
+        }
       } else {
-        success('Welcome back!')
+        console.log('Sign-in successful');
+        // Only show "Welcome back!" if this is NOT a new user
+        if (!isNewUser) {
+          console.log('Showing welcome back toast for existing user');
+          success('Welcome back!')
+        } else {
+          console.log('Suppressing welcome back toast - new user will see welcome modal');
+        }
         router.push('/')
       }
     } catch (err) {
+      console.log('Caught exception:', err);
       showError('Something went wrong. Please try again.')
     } finally {
       setIsLoading(false)
@@ -75,7 +119,6 @@ export default function SignInPage() {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 disabled={isLoading}
               />
             </div>
@@ -90,7 +133,6 @@ export default function SignInPage() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 disabled={isLoading}
               />
             </div>

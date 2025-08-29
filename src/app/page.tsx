@@ -49,20 +49,23 @@ export default function DashboardPage() {
     if (user && !dataLoaded) {
       const loadAllData = async () => {
         try {
+          console.log('🔄 Loading app data...');
+          
           await Promise.all([
             loadNotes(),
             loadFolders(),
             loadTags()
           ]);
+          console.log('✅ App data loaded successfully');
           setDataLoaded(true);
         } catch (error) {
-          console.error('Error loading data:', error);
+          console.error('❌ Error loading data:', error);
         }
       };
       
       loadAllData();
     }
-  }, [user, dataLoaded, loadNotes, loadFolders, loadTags]);
+  }, [user, dataLoaded]);
 
   // Show loading state while checking authentication
   if (loading) {
@@ -127,10 +130,13 @@ export default function DashboardPage() {
           ) : (
             <div className="flex items-center justify-center h-full text-center p-4 overflow-y-auto">
               <div className="max-w-md">
-                <div className="text-5xl mb-4">✍️</div>
-                <h3 className="text-xl font-semibold mb-3">Ready to write?</h3>
+                <div className="text-6xl mb-4">📝</div>
+                <h3 className="text-3xl font-bold mb-2">Notes</h3>
+                <p className="text-lg text-muted-foreground mb-6">
+                  Capture your thoughts, organize your ideas
+                </p>
                 <p className="text-muted-foreground mb-6">
-                  Select a note from the list on the left, or create a new one to start capturing your thoughts.
+                  Select a note from the list on the left, or create a new one to start writing.
                 </p>
                 <div className="space-y-3">
                   <Button 

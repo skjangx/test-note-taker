@@ -7,9 +7,9 @@ import { useFoldersStore } from '@/lib/store/folders';
 import { useTagsStore } from '@/lib/store/tags';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { WelcomeModal } from '@/components/modals/WelcomeModal';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -22,6 +22,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const loadTags = useTagsStore((state) => state.loadTags);
   const { theme, sidebarOpen } = useUIStore();
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   
   const showSidebar = pathname !== '/settings';
 
@@ -49,38 +50,25 @@ export function AppLayout({ children }: AppLayoutProps) {
   
 
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Load data from database (parallel loading)
-        await Promise.all([
-          loadNotes(),
-          loadFolders(),
-          loadTags()
-        ]);
-        
-        // Initialize theme
-        const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-        if (savedTheme) {
-          useUIStore.getState().setTheme(savedTheme);
-        }
-        
-        console.log('✅ App data loaded successfully');
-      } catch (error) {
-        console.error('❌ Error loading app data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // Mark as mounted to avoid hydration mismatches
+    setIsMounted(true);
     
-    initializeApp();
-  }, [loadNotes, loadFolders, loadTags]);
+    // Initialize theme after mounting to avoid SSR mismatch
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (savedTheme) {
+      useUIStore.getState().setTheme(savedTheme);
+    }
+    
+    // Set loading to false immediately - no async operations needed
+    setIsLoading(false);
+  }, []);
 
-  if (isLoading) {
+  if (isLoading || !isMounted) {
     return (
       <div className="flex h-screen bg-background items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading your notes...</p>
+          <p className="text-muted-foreground">Initializing...</p>
         </div>
       </div>
     );
@@ -107,7 +95,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </main>
       </div>
-      <Toaster position="bottom-right" />
+      
+      {/* Welcome Modal for new users */}
+      <WelcomeModal />
     </div>
   );
 }

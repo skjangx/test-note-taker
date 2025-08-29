@@ -7,18 +7,32 @@ import { Label } from '@/components/ui/label';
 import { useUIStore } from '@/lib/store/ui';
 import { useNotesStore } from '@/lib/store/notes';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Trash2, Moon, Sun, ArrowLeft, Eye, EyeOff, User } from 'lucide-react';
+import { Download, Upload, Trash2, Moon, Sun, ArrowLeft, Eye, EyeOff, User, UserX, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { supabaseService } from '@/lib/supabase-service';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useUIStore();
   const { notes } = useNotesStore();
   const { success, error } = useToast();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleExportData = () => {
     try {
@@ -48,7 +62,79 @@ export default function SettingsPage() {
   };
 
   const handleClearAllData = () => {
-    error('Clear data feature disabled - data is now stored securely in Supabase. Contact support for account deletion.');
+    error('Clear data feature disabled - data is now stored securely in Supabase. Use "Delete Account" to remove all data.');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) {
+      error('No user logged in');
+      return;
+    }
+
+    setIsDeleting(true);
+    
+    try {
+      console.log('Deleting user account and all data...');
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      
+      // Get the user's current session for authorization
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        error('No valid session found. Please sign in again.');
+        return;
+      }
+      
+      console.log('Calling Edge Function with direct fetch...');
+      console.log('Full URL:', `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`);
+      
+      // First try OPTIONS request to check CORS
+      try {
+        const optionsResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`, {
+          method: 'OPTIONS',
+          headers: {
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          },
+        });
+        console.log('OPTIONS response status:', optionsResponse.status);
+      } catch (optionsError) {
+        console.error('OPTIONS request failed:', optionsError);
+      }
+      
+      // Now make the actual POST request (no body needed)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        },
+        // No body at all since the Edge Function doesn't need it
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Edge Function HTTP error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('Edge Function success:', result);
+      
+      success('Account and all data permanently deleted. You have been signed out.');
+      
+      // Sign out and redirect
+      await signOut();
+      router.push('/auth/signin');
+      
+    } catch (err) {
+      console.error('Delete account error:', err);
+      error(`Failed to delete account: ${err instanceof Error ? err.message : 'Please try again.'}`);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -137,6 +223,58 @@ export default function SettingsPage() {
                   ? 'Passwords are encrypted and cannot be displayed for security reasons'
                   : 'Passwords are managed securely by Supabase'
                 }
+              </p>
+            </div>
+            
+            <div className="pt-4 border-t">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="destructive" 
+                    className="gap-2 w-full"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Deleting Account...
+                      </>
+                    ) : (
+                      <>
+                        <UserX className="h-4 w-4" />
+                        Delete Account
+                      </>
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete your account and all associated data including notes, folders, and tags. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        'Delete Account'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <p className="text-xs text-muted-foreground mt-2">
+                This will permanently delete all your data and cannot be undone.
               </p>
             </div>
           </CardContent>

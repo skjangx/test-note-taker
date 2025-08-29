@@ -21,8 +21,28 @@ export default function SignUpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!email || !password || !confirmPassword) {
-      showError('Please fill in all fields')
+    // Validate email field
+    if (!email.trim()) {
+      showError('Please enter your email address')
+      return
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      showError('Please enter a valid email address')
+      return
+    }
+    
+    // Validate password field
+    if (!password) {
+      showError('Please enter a password')
+      return
+    }
+    
+    // Validate confirm password field
+    if (!confirmPassword) {
+      showError('Please confirm your password')
       return
     }
 
@@ -42,7 +62,14 @@ export default function SignUpPage() {
       const { error, emailConfirmationSent: confirmationSent } = await signUp(email, password)
       
       if (error) {
-        showError(error.message)
+        // Handle specific error cases
+        if (error.message.includes('User already registered') || 
+            error.message.includes('already registered') ||
+            error.message.includes('already been registered')) {
+          showError(`An account with "${email}" already exists. If you haven't confirmed your email, check your inbox for the confirmation link. If confirmed, please sign in instead.`)
+        } else {
+          showError(error.message)
+        }
       } else if (confirmationSent) {
         setEmailConfirmationSent(true)
         success('Account created! Check your email to confirm.')
@@ -158,7 +185,6 @@ export default function SignUpPage() {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 disabled={isLoading}
               />
             </div>
@@ -173,7 +199,6 @@ export default function SignUpPage() {
                 placeholder="Create a password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
@@ -191,7 +216,6 @@ export default function SignUpPage() {
                 placeholder="Confirm your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                required
                 disabled={isLoading}
               />
             </div>

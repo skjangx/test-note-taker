@@ -1,105 +1,65 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-
-function ConfirmPageContent() {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
-  const [message, setMessage] = useState('')
-  const searchParams = useSearchParams()
-  const router = useRouter()
-
-  useEffect(() => {
-    const handleEmailConfirmation = async () => {
-      const token = searchParams.get('token')
-      const type = searchParams.get('type')
-
-      if (!token || type !== 'signup') {
-        setStatus('error')
-        setMessage('Invalid confirmation link')
-        return
-      }
-
-      try {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: token,
-          type: 'signup',
-        })
-
-        if (error) {
-          setStatus('error')
-          setMessage(`Confirmation failed: ${error.message}`)
-        } else {
-          setStatus('success')
-          setMessage('Email confirmed successfully! You can now sign in.')
-          
-          // Redirect to home after 2 seconds
-          setTimeout(() => {
-            router.push('/')
-          }, 2000)
-        }
-      } catch (err) {
-        setStatus('error')
-        setMessage('An unexpected error occurred')
-      }
-    }
-
-    handleEmailConfirmation()
-  }, [searchParams, router])
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <CardTitle className="text-center">
-            {status === 'loading' && '⏳ Confirming Email...'}
-            {status === 'success' && '✅ Email Confirmed!'}
-            {status === 'error' && '❌ Confirmation Failed'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <p className="text-muted-foreground">{message}</p>
-          
-          {status === 'success' && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Redirecting to home page...
-              </p>
-              <Button onClick={() => router.push('/')} className="w-full">
-                Continue to App
-              </Button>
-            </div>
-          )}
-          
-          {status === 'error' && (
-            <Button onClick={() => router.push('/')} variant="outline" className="w-full">
-              Back to Home
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+import { CheckCircle } from 'lucide-react'
 
 export default function ConfirmPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle className="text-center">⏳ Loading...</CardTitle>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <div className="w-full max-w-md space-y-8">
+        {/* App Header/Logo */}
+        <div className="text-center">
+          <div className="text-6xl mb-4">📝</div>
+          <h1 className="text-3xl font-bold text-foreground">Notes</h1>
+          <p className="text-lg text-muted-foreground mt-2">
+            Capture your thoughts, organize your ideas
+          </p>
+        </div>
+        
+        <Card className="w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-green-700 dark:text-green-400">
+              Email Confirmed! 🎉
+            </CardTitle>
+            <p className="text-muted-foreground mt-2">
+              Your account has been successfully verified
+            </p>
           </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground">Please wait...</p>
+          
+          <CardContent className="space-y-6">
+            <div className="rounded-lg bg-green-50 dark:bg-green-950/50 p-4 border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                <strong>Great!</strong> Your email has been confirmed and your account is now active.
+              </p>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <p className="text-muted-foreground">
+                Your account is now ready! You can sign in with your credentials to start taking notes.
+              </p>
+              
+              <p className="text-xs text-muted-foreground">
+                We&apos;ve prepared sample notes and folders to get you started!
+              </p>
+            </div>
           </CardContent>
         </Card>
+        
+        {/* Attribution Footer */}
+        <div className="text-center">
+          <p className="text-xs text-muted-foreground">
+            Built by{' '}
+            <span className="font-medium">skjangx</span>
+            {' '}to test Supabase BE
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Aug 27th to 28th, 2025
+          </p>
+        </div>
       </div>
-    }>
-      <ConfirmPageContent />
-    </Suspense>
+    </div>
   )
 }

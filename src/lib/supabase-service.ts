@@ -407,4 +407,5 @@ export const supabaseService = {
 
     if (error) throw error
   },
+
 }
