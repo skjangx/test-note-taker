@@ -10,14 +10,14 @@ interface ConditionalLayoutProps {
 
 export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname()
-  const { user } = useAuth()
+  const { user, loading, isSettingUpUser } = useAuth()
   
   // Auth pages that should not have the app layout
   const authPages = ['/auth/signin', '/auth/signup', '/auth/confirm']
   const isAuthPage = authPages.some(page => pathname.startsWith(page))
   
-  // If it's an auth page or user is not authenticated, render without app layout
-  if (isAuthPage || !user) {
+  // If it's an auth page, user is not authenticated, still loading, or user is being set up, render without app layout
+  if (isAuthPage || !user || loading || isSettingUpUser) {
     return <>{children}</>
   }
   

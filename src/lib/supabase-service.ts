@@ -70,6 +70,8 @@ export const supabaseService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
 
+    console.log('🔍 getNotes() - Loading notes for user:', user.id.slice(0,8))
+
     const { data, error } = await supabase
       .from('notes')
       .select(`
@@ -83,8 +85,32 @@ export const supabaseService = {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
 
-    if (error) throw error
-    return data?.map(transformNote) || []
+    if (error) {
+      console.error('❌ getNotes() error:', error)
+      throw error
+    }
+    
+    console.log('📝 getNotes() - Raw data from database:', {
+      count: data?.length || 0,
+      userIds: [...new Set(data?.map(note => note.user_id) || [])],
+      currentUserId: user.id,
+      matchingUserIds: data?.filter(note => note.user_id === user.id).length || 0,
+      nonMatchingUserIds: data?.filter(note => note.user_id !== user.id).length || 0,
+      sampleNoteIds: data?.slice(0, 5).map(note => ({ 
+        id: note.id.slice(0,8), 
+        title: note.title, 
+        user_id: note.user_id.slice(0,8),
+        matches: note.user_id === user.id
+      })) || []
+    })
+    
+    const transformedNotes = data?.map(transformNote) || []
+    console.log('📝 getNotes() - Transformed notes:', {
+      count: transformedNotes.length,
+      titles: transformedNotes.map(note => note.title)
+    })
+    
+    return transformedNotes
   },
 
   async createNote(noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {

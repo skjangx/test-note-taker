@@ -1,8 +1,11 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { User, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useNotesStore } from '@/lib/store/notes'
+import { useFoldersStore } from '@/lib/store/folders'
+import { useTagsStore } from '@/lib/store/tags'
 
 // Helper function to ensure user profile exists and check if sample data is needed
 const ensureUserProfile = async (user: User): Promise<boolean> => {
@@ -48,7 +51,7 @@ const ensureUserProfile = async (user: User): Promise<boolean> => {
             .eq('id', user.id)
             .maybeSingle()
           
-          return !retryProfile?.sample_data_created || false
+          return !retryProfile?.sample_data_created
         }
         return false
       } else {
@@ -80,9 +83,12 @@ const ensureUserProfile = async (user: User): Promise<boolean> => {
 
 // Helper function to create sample data (run in background)
 const createSampleDataAsync = async (user: User) => {
+  const executionId = Math.random().toString(36).substring(7)
+  console.log(`🚀 [EXEC-${executionId}] createSampleDataAsync STARTED for user:`, user.id.slice(0,8))
+  
   try {
     // Create folders first
-    console.log('Creating sample folders...')
+    console.log(`📁 [EXEC-${executionId}] Creating sample folders...`)
     const { data: foldersData, error: foldersError } = await supabase
       .from('folders')
       .insert([
@@ -91,6 +97,12 @@ const createSampleDataAsync = async (user: User) => {
         { user_id: user.id, name: 'Ideas', color: '#f59e0b' }
       ])
       .select()
+    
+    console.log(`📁 [EXEC-${executionId}] Folders insert result:`, { 
+      success: !foldersError, 
+      count: foldersData?.length || 0,
+      error: foldersError 
+    })
 
     if (foldersError) {
       console.error('Failed to create folders:', JSON.stringify(foldersError, null, 2))
@@ -99,7 +111,7 @@ const createSampleDataAsync = async (user: User) => {
     }
 
     // Create tags second
-    console.log('Creating sample tags...')
+    console.log(`🏷️ [EXEC-${executionId}] Creating sample tags...`)
     const { data: tagsData, error: tagsError } = await supabase
       .from('tags')
       .insert([
@@ -109,6 +121,12 @@ const createSampleDataAsync = async (user: User) => {
         { user_id: user.id, name: 'project', color: '#22c55e' }
       ])
       .select()
+    
+    console.log(`🏷️ [EXEC-${executionId}] Tags insert result:`, { 
+      success: !tagsError, 
+      count: tagsData?.length || 0,
+      error: tagsError 
+    })
 
     if (tagsError) {
       console.error('Failed to create tags:', tagsError)
@@ -117,8 +135,11 @@ const createSampleDataAsync = async (user: User) => {
     }
 
     // Create sample notes if we have folders and tags
+    let notesCreated = 0
+    let notesErrors = 0
+    
     if (!foldersError && !tagsError && foldersData && tagsData) {
-      console.log('Creating sample notes...')
+      console.log(`📝 [EXEC-${executionId}] Creating sample notes...`)
       
       const sampleNotes = [
         {
@@ -166,6 +187,8 @@ const createSampleDataAsync = async (user: User) => {
       ]
 
       for (const noteTemplate of sampleNotes) {
+        console.log(`📝 [EXEC-${executionId}] Creating note: "${noteTemplate.title}"`)
+        
         const { data: noteData, error: noteError } = await supabase
           .from('notes')
           .insert({
@@ -178,9 +201,11 @@ const createSampleDataAsync = async (user: User) => {
           .select()
 
         if (noteError) {
-          console.error('Failed to create sample note:', noteTemplate.title, noteError)
+          console.error(`❌ [EXEC-${executionId}] Failed to create note "${noteTemplate.title}":`, noteError)
+          notesErrors++
         } else {
-          console.log('✅ Sample note created:', noteTemplate.title)
+          console.log(`✅ [EXEC-${executionId}] Note created: "${noteTemplate.title}" (ID: ${noteData?.[0]?.id})`)
+          notesCreated++
           
           // Add tags to the note
           if (noteData?.[0] && noteTemplate.tags) {
@@ -206,22 +231,33 @@ const createSampleDataAsync = async (user: User) => {
       }
     }
 
-    // Mark profile as having sample data created
-    console.log('Marking profile as having sample data created...')
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ sample_data_created: true })
-      .eq('id', user.id)
+    // Only mark profile as having sample data created if ALL components were successful
+    const allDataCreated = !foldersError && !tagsError && notesErrors === 0 && notesCreated > 0
+    
+    if (allDataCreated) {
+      console.log('Marking profile as having sample data created...')
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ sample_data_created: true })
+        .eq('id', user.id)
 
-    if (updateError) {
-      console.error('Failed to update sample_data_created flag:', updateError)
+      if (updateError) {
+        console.error('Failed to update sample_data_created flag:', updateError)
+      } else {
+        console.log('✅ Profile marked as having sample data created')
+        console.log(`📊 Sample data summary: ${notesCreated} notes, 3 folders, 4 tags`)
+      }
     } else {
-      console.log('✅ Profile marked as having sample data created')
+      console.log('❌ Sample data creation failed - NOT marking profile as complete')
+      console.log('Folders error:', foldersError)
+      console.log('Tags error:', tagsError)
+      console.log('Notes created:', notesCreated, 'Notes errors:', notesErrors)
+      // Don't update the profile - this will allow retry on next auth event
     }
 
-    console.log('Sample data creation completed')
+    console.log(`🏁 [EXEC-${executionId}] createSampleDataAsync COMPLETED for user:`, user.id.slice(0,8))
   } catch (sampleError) {
-    console.error('Unexpected error creating sample data:', sampleError)
+    console.error(`❌ [EXEC-${executionId}] Unexpected error creating sample data:`, sampleError)
   }
 }
 
@@ -247,6 +283,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
   const [authHandlerProcessedUser, setAuthHandlerProcessedUser] = useState<string | null>(null)
   const [isSettingUpUser, setIsSettingUpUser] = useState(false)
+  const sampleDataCreationInProgress = useRef<string | null>(null)
+  
+
+  // Track component lifecycle
+  console.log('🏁 AuthProvider component mounted/remounted at', new Date().toISOString())
 
   useEffect(() => {
     let isInitialLoad = true
@@ -263,68 +304,218 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const user = session?.user ?? null
+      const eventId = Math.random().toString(36).substring(7) // Unique ID for this event
       
-      console.log('🔄 Auth state changed:', { event, isInitialLoad, hasUser: !!user })
+      console.log(`🚨 AUTH EVENT [${eventId}] FIRED:`, { 
+        event, 
+        isInitialLoad, 
+        hasUser: !!user, 
+        userId: user?.id?.slice(0,8),
+        timestamp: new Date().toISOString()
+      })
+      console.log(`🔍 [${eventId}] Current sampleDataCreationInProgress:`, sampleDataCreationInProgress.current)
       
-      // CRITICAL: Set loading state BEFORE setting user to prevent empty app flash
+      // Set user first
+      setUser(user)
+      
+      // CRITICAL: Set loading state immediately after user for email confirmation flow
       if (!isInitialLoad && user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
-        console.log('🔐 User signing in - SET LOADING STATE FIRST')
+        console.log(`🔐 [${eventId}] User signing in - SET LOADING STATE`)
         setIsSettingUpUser(true)
       }
       
-      // Now set the user (this will trigger app render)
-      setUser(user)
-      
       // Debug: Check ALL events to see what's happening
       if (!isInitialLoad && user) {
-        console.log(`🔍 Auth event: ${event} (user: ${user.id.slice(0, 8)}...)`)
+        console.log(`🔍 [${eventId}] Auth event: ${event} (user: ${user.id.slice(0, 8)}...)`)
       }
       
       // Handle any user authentication event - check if they need setup
       if (!isInitialLoad && user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
-        console.log('🔐 User signed in, checking if setup needed...')
+        console.log(`🔐 [${eventId}] User signed in, checking if setup needed...`, { 
+          event, 
+          userId: user.id.slice(0,8),
+          currentProgress: sampleDataCreationInProgress.current 
+        })
         
-        // Quick check if user needs sample data
+        // Wait for profile to exist and check if user needs sample data
         setTimeout(async () => {
+          console.log(`⏰ [${eventId}] setTimeout callback started at`, new Date().toISOString())
           try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('sample_data_created')
-              .eq('id', user.id)
-              .single()
+            // Keep trying until profile exists
+            let profile = null
+            let attempts = 0
+            const maxAttempts = 4
             
-            if (!profile?.sample_data_created) {
-              console.log('🆕 New user detected, creating sample data...')
+            while (!profile && attempts < maxAttempts) {
+              console.log(`🔍 [${eventId}] Checking for profile (attempt ${attempts + 1}/${maxAttempts})...`)
               
-              await createSampleDataAsync(user)
-              console.log('✅ Sample data created, showing welcome modal')
+              const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('sample_data_created')
+                .eq('id', user.id)
+                .maybeSingle()
               
-              setShowWelcomeModal(true)
+              console.log(`🔍 [${eventId}] Profile check attempt ${attempts + 1} result:`, {
+                profileData,
+                error: error?.message,
+                sampleDataCreated: profileData?.sample_data_created
+              })
+              
+              if (profileData) {
+                profile = profileData
+                break
+              }
+              
+              if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+                console.error(`❌ [${eventId}] Profile check error:`, error)
+              }
+              
+              attempts++
+              if (attempts < maxAttempts) {
+                console.log(`⏱️ [${eventId}] Profile not ready, waiting 1 second...`)
+                await new Promise(resolve => setTimeout(resolve, 1000))
+              }
+            }
+            
+            if (!profile) {
+              console.log(`🔨 [${eventId}] Profile not found after all attempts, creating new profile...`)
+              
+              // Create the profile now
+              const { error: createError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: user.id,
+                  name: user.email?.split('@')[0] || 'User',
+                  email: user.email,
+                  sample_data_created: false // New profiles need sample data
+                })
+
+              if (createError) {
+                console.error(`❌ [${eventId}] Failed to create profile:`, createError)
+                setIsSettingUpUser(false)
+                return
+              }
+              
+              console.log(`✅ [${eventId}] Profile created successfully`)
+              profile = { sample_data_created: false }
+            }
+            
+            console.log(`✅ [${eventId}] Profile found, checking sample data status`)
+            
+            if (!profile.sample_data_created) {
+              console.log(`🔍 [${eventId}] COMPREHENSIVE DUPLICATE CHECK:`, {
+                eventId,
+                userId: user.id.slice(0,8),
+                profileSampleDataCreated: profile.sample_data_created,
+                currentProgress: sampleDataCreationInProgress.current,
+                willSkipInProgress: sampleDataCreationInProgress.current === user.id,
+                timestamp: new Date().toISOString()
+              })
+              
+              // Primary check: useRef for immediate deduplication
+              if (sampleDataCreationInProgress.current === user.id) {
+                console.log(`🔄 [${eventId}] Sample data creation already in progress (useRef check), skipping...`)
+                return
+              }
+              
+              // Secondary check: verify no sample data exists in database
+              console.log(`🔍 [${eventId}] Double-checking: verifying no sample data exists in database...`)
+              const { data: existingNotes } = await supabase
+                .from('notes')
+                .select('id')
+                .eq('user_id', user.id)
+                .limit(1)
+              
+              const { data: existingFolders } = await supabase
+                .from('folders')
+                .select('id')
+                .eq('user_id', user.id)
+                .limit(1)
+              
+              if (existingNotes && existingNotes.length > 0) {
+                console.log(`⚠️ [${eventId}] Sample data already exists in database (found ${existingNotes.length} notes), marking profile as complete...`)
+                // Mark profile as complete to prevent future attempts
+                await supabase
+                  .from('profiles')
+                  .update({ sample_data_created: true })
+                  .eq('id', user.id)
+                return
+              }
+              
+              if (existingFolders && existingFolders.length > 0) {
+                console.log(`⚠️ [${eventId}] Sample data already exists in database (found ${existingFolders.length} folders), marking profile as complete...`)
+                // Mark profile as complete to prevent future attempts
+                await supabase
+                  .from('profiles')
+                  .update({ sample_data_created: true })
+                  .eq('id', user.id)
+                return
+              }
+              
+              console.log(`🆕 [${eventId}] New user confirmed - no existing data found, creating sample data...`, {
+                eventId,
+                userId: user.id.slice(0,8),
+                settingProgress: true,
+                timestamp: new Date().toISOString()
+              })
+              
+              // Set in-progress flag
+              sampleDataCreationInProgress.current = user.id
+              console.log(`✅ [${eventId}] Progress flag set (useRef only)`)
+              
+              try {
+                await createSampleDataAsync(user)
+                console.log(`✅ [${eventId}] Sample data created, reloading app data...`)
+                
+                // Reload all data after sample data creation
+                try {
+                  await Promise.all([
+                    useNotesStore.getState().loadNotes(),
+                    useFoldersStore.getState().loadFolders(),
+                    useTagsStore.getState().loadTags()
+                  ])
+                  console.log(`✅ [${eventId}] App data reloaded after sample data creation`)
+                } catch (reloadError) {
+                  console.error(`❌ [${eventId}] Failed to reload app data:`, reloadError)
+                }
+                
+                setShowWelcomeModal(true)
+              } finally {
+                sampleDataCreationInProgress.current = null
+                console.log(`🧹 [${eventId}] Progress flag cleared`)
+              }
             } else {
-              console.log('👤 Existing user, no setup needed')
+              console.log(`👤 [${eventId}] Existing user, no setup needed`)
             }
             
             // Always clear loading state when done
             setIsSettingUpUser(false)
+            console.log(`🏁 [${eventId}] setTimeout callback completed at`, new Date().toISOString())
           } catch (error) {
-            console.error('Error checking user setup:', error)
+            console.error(`❌ [${eventId}] Error checking user setup:`, error)
             setIsSettingUpUser(false) // Clear loading state on error too
           }
-        }, 500) // Shorter delay since we're checking all sign-ins
+        }, 500)
       }
       
-      // For page refreshes, ensure profile exists in background (non-blocking)
-      if (user && isInitialLoad) {
-        // Run profile check in background without blocking UI
-        ensureUserProfile(user).catch(error => {
-          console.error('Background profile check failed:', error)
-        })
-      }
+      // Skip background profile check - let the main auth handler take care of everything
+      // This was causing race conditions and duplicate sample data creation
       
       isInitialLoad = false
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      console.log('🚪 AuthProvider component unmounting, unsubscribing auth listener')
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // Check if we're in React Strict Mode (which runs effects twice)
+  useEffect(() => {
+    console.log('🔍 useEffect running - React Strict Mode might cause this to run twice in development')
+    return () => {
+      console.log('🔍 useEffect cleanup - React Strict Mode might cause this to run twice in development')
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
