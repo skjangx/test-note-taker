@@ -317,7 +317,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // User is considered "new" if they don't have sample data created yet
         isNewUser = !profile?.sample_data_created
-        console.log('Sign-in user status:', { hasProfile: !!profile, sampleDataCreated: profile?.sample_data_created, isNewUser })
+        console.log('🔍 Sign-in user status check:', { 
+          userId: data.user.id,
+          hasProfile: !!profile, 
+          sampleDataCreated: profile?.sample_data_created, 
+          isNewUser,
+          willShowWelcomeToast: !isNewUser,
+          willShowWelcomeModal: isNewUser
+        })
       } catch (err) {
         console.error('Error checking user status during signin:', err)
       }

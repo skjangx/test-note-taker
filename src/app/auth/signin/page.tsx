@@ -70,13 +70,13 @@ export default function SignInPage() {
           showError(error.message)
         }
       } else {
-        console.log('Sign-in successful');
+        console.log('🎉 Sign-in successful');
         // Only show "Welcome back!" if this is NOT a new user
         if (!isNewUser) {
-          console.log('Showing welcome back toast for existing user');
+          console.log('✅ Showing welcome back toast for existing user');
           success('Welcome back!')
         } else {
-          console.log('Suppressing welcome back toast - new user will see welcome modal');
+          console.log('🚫 Suppressing welcome back toast - new user will see welcome modal');
         }
         router.push('/')
       }
